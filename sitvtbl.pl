@@ -31,7 +31,7 @@ use Data::Dumper;               # debug only
 
 # See short history at end of module
 
-my $gVersion = "1.08000";
+my $gVersion = "1.09000";
 my $gWin = (-e "C://") ? 1 : 0;    # 1=Windows, 0=Linux/Unix
 
 # communicate without certificates
@@ -211,7 +211,7 @@ my $passwd="";
 $rc = init();
 
 $opt_log = $opt_workpath . $opt_log;
-open FH, ">>$opt_log" or die "can't open $opt_log: $!";
+open FH, "+>>$opt_log" or die "can't open $opt_log: $!";
 
 logit(0,"SITAUDIT000I - ITM_virt_table $gVersion $args_start");
 
@@ -252,8 +252,8 @@ my $onetems;
 my $show_sql = "show.sql";
 my $delete_sql = "delete.sql";
 
-open SH, ">$show_sql" or die "can't open $show_sql: $!";
-open DH, ">$delete_sql" or die "can't open $delete_sql: $!";
+open SH, "+>$show_sql" or die "can't open $show_sql: $!";
+open DH, "+>$delete_sql" or die "can't open $delete_sql: $!";
 
 my $show_line;
 my $delete_line;
@@ -361,8 +361,8 @@ close DH;
 # to N which is default like this:.
 # ./tacmd setagentconnection -t LZ -n NMP180:LZ -e IRA_DUMP_DATA=N
 
-open CMD, ">$opt_recycle_cmd" or die "can't open $opt_recycle_cmd: $!";
-open SH, ">$opt_recycle_sh" or die "can't open $opt_recycle_sh: $!";
+open CMD, "+>$opt_recycle_cmd" or die "can't open $opt_recycle_cmd: $!";
+open SH, "+>$opt_recycle_sh" or die "can't open $opt_recycle_sh: $!";
 binmode(SH);
 
 my $cmd_line;
@@ -377,9 +377,15 @@ for (my $i=0;$i<=$siti;$i++) {
             next if $nsave_o4online[$j] ne "Y";
             next if $iproduct ne $hx;                 # ignore if agent product is not the one with UADVISOR
             my $iip = $agentipx{$nsave[$j]};          # see if agent has known IP address
-            die "agent $nsave[$j] has no recorded IP address" if !defined $iip;
+            if (!defined $iip) {
+               warn "agent $nsave[$j] has no recorded IP address";
+               next;
+            }
             my $vtagent_ref = $vtagentx{$iip};        # look up the VT [Virtual Table] agent
-            die if !defined $vtagent_ref;
+            if (!defined $vtagent_ref) {
+               warn "vtagentx unknown for ip address $iip";
+               next;
+            }
             $vtagent_ref->{restart} += 1;             # up agent restart count
             if ($vtagent_ref->{restart} == 1) {       # only do restart logic once
                # validate the agent name suffix.      # The tacmd restart agent depends on it
@@ -1940,3 +1946,4 @@ $run_status++;
 # 1.08000  : Identify cases where restart agents do not have online OS Agents
 #          : Warn for cases where agent name does not have proper suffix
 #          : Consolidate duplicated logic
+# 1.09000  : Overlay output files
