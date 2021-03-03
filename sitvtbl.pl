@@ -31,7 +31,7 @@ use Data::Dumper;               # debug only
 
 # See short history at end of module
 
-my $gVersion = "1.09000";
+my $gVersion = "1.10000";
 my $gWin = (-e "C://") ? 1 : 0;    # 1=Windows, 0=Linux/Unix
 
 # communicate without certificates
@@ -376,6 +376,7 @@ for (my $i=0;$i<=$siti;$i++) {
             my $iproduct = $nsave_product[$j];        # ignore offline agents
             next if $nsave_o4online[$j] ne "Y";
             next if $iproduct ne $hx;                 # ignore if agent product is not the one with UADVISOR
+            $DB::single=2 if $nsave[$j] eq "MSSQLSERVER:P8WRCPEBTSQ01B:MSS";
             my $iip = $agentipx{$nsave[$j]};          # see if agent has known IP address
             if (!defined $iip) {
                warn "agent $nsave[$j] has no recorded IP address";
@@ -386,8 +387,10 @@ for (my $i=0;$i<=$siti;$i++) {
                warn "vtagentx unknown for ip address $iip";
                next;
             }
-            $vtagent_ref->{restart} += 1;             # up agent restart count
-            if ($vtagent_ref->{restart} == 1) {       # only do restart logic once
+            my $vtagenti_ref = $vtagent_ref->{instances}{$nsave[$j]};
+            next if !defined $vtagenti_ref;
+            $vtagenti_ref->{restart} += 1;             # up agent restart count
+            if ($vtagenti_ref->{restart} == 1) {       # only do restart logic once
                # validate the agent name suffix.      # The tacmd restart agent depends on it
                my $isuff = $suffx{$hx};
                my $neglen = -1 * length($isuff);
@@ -399,7 +402,7 @@ for (my $i=0;$i<=$siti;$i++) {
                }
                my $osagent_ref = $osagentx{$iip};     # Check to see if OS Agent is present
                if (defined $osagent_ref) {            # need OS agent
-                  if ($osagent_ref->{hostname} eq $vtagent_ref->{hostname}) {  # do hostnames agree
+                  if ($osagent_ref->{hostname} eq $vtagenti_ref->{hostname}) {  # do hostnames agree
                      $cmd_line = "tacmd restartAgent -m  $nsave[$j]\n";
                      if ($hx eq "UX") {
                         if ($nsave_temaver[$j] ge "06.23.00") {
@@ -414,12 +417,12 @@ for (my $i=0;$i<=$siti;$i++) {
                      print CMD $cmd_line;
                      print SH "./" . $cmd_line;
                   } else {
-                     $cmd_line = "System[$iip] Agent[$nsave[$j]] has hostname[$vtagent_ref->{hostname}] conflicts with OS Agent[$osagent_ref->{node} with hostname[$osagent_ref->{hostname}]\n";
+                     $cmd_line = "System[$iip] Agent[$nsave[$j]] has hostname[$vtagenti_ref->{hostname}] conflicts with OS Agent[$osagent_ref->{node} with hostname[$osagent_ref->{hostname}] so manual restart needed\n";
                      print CMD "REM " . $cmd_line;
                      print SH "# " . $cmd_line;
                   }
                } else {
-                  $cmd_line = "System[$iip] Agent[$nsave[$j]] has hostname[$vtagent_ref->{hostname}] has no online OS agent to perform work\n";
+                  $cmd_line = "System[$iip] Agent[$nsave[$j]] has hostname[$vtagenti_ref->{hostname}] has no online OS agent to perform work so manual restart needed\n";
                   print CMD "REM " . $cmd_line;
                   print SH "# " . $cmd_line;
                }
@@ -506,21 +509,32 @@ sub new_tnodesav {
          }
          $osagent_ref->{count} += 1;
       }
+
       if (defined $vtblx{$iproduct}) {
-         my $vtagent_ref = $vtagentx{$inode};
+         my $vtagent_ref = $vtagentx{$iip};
          if (!defined $vtagent_ref) {
             my %vtagentref = (
-                              hostname => $ihostname,
-                              node => $inode,
-                              o4online => $io4online,
-                              count => 0,
-                              product => $iproduct,
-                              restart => 0,
-                           );
+                                instances => {},
+                                count => 0,
+                             );
             $vtagent_ref = \%vtagentref;
             $vtagentx{$iip}  = \%vtagentref;
          }
          $vtagent_ref->{count} += 1;
+         my $vtagenti_ref = $vtagent_ref->{instances}{$inode};
+         if (!defined $vtagenti_ref) {
+            my %vtagentiref = (
+                                 hostname => $ihostname,
+                                 node => $inode,
+                                 o4online => $io4online,
+                                 count => 0,
+                                 product => $iproduct,
+                                 restart => 0,
+                              );
+            $vtagenti_ref = \%vtagentiref;
+            $vtagent_ref->{instances}{$inode} = \%vtagentiref;
+         }
+         $vtagenti_ref->{count} += 1;
       }
       $agentipx{$inode} = $iip;
    }
@@ -1947,3 +1961,4 @@ $run_status++;
 #          : Warn for cases where agent name does not have proper suffix
 #          : Consolidate duplicated logic
 # 1.09000  : Overlay output files
+# 1.10000  : Handle multiple VT agents on single system
