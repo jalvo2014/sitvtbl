@@ -31,7 +31,7 @@ use Data::Dumper;               # debug only
 
 # See short history at end of module
 
-my $gVersion = "1.10000";
+my $gVersion = "1.12000";
 my $gWin = (-e "C://") ? 1 : 0;    # 1=Windows, 0=Linux/Unix
 
 # communicate without certificates
@@ -747,7 +747,9 @@ sub init_lst {
       $ll += 1;
       next if $ll < 2;
       ($inode,$inodelist,$inodetype) = parse_lst(3,$oneline);
-      next if $inodetype ne "M";
+      if ($inodetype ne "M") {
+         next if $inodetype ne "";
+      }
       $hub_tems = $inode if $inodelist eq "*HUB";
       if (($inodelist eq "*HUB") or ($inodelist eq "*ALL_CMS")) {
          $temsi += 1;
@@ -1962,3 +1964,5 @@ $run_status++;
 #          : Consolidate duplicated logic
 # 1.09000  : Overlay output files
 # 1.10000  : Handle multiple VT agents on single system
+# 1.11000  : Correct a LST extraction shell file missed a column
+# 1.12000  : Handle case where *HUB in TNODELST has null NODETYPE
